@@ -15,10 +15,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build image
         run: | 
-              docker build -t ${{secrets.USERNAME}}/portfolio:${{github.run_number}} .
-              docker build -t ${{secrets.USERNAME}}/portfolio .
+              docker build -t ${{secrets.REGISTRY_USERNAME}}/portfolio:${{github.run_number}} .
+              docker build -t ${{secrets.REGISTRY_USERNAME}}/portfolio .
       - name: Push image 
         run: |
-            docker login -u ${{secrets.USERNAME}} -p ${{secrets.REGISTRY_PASS}}
-            docker push ${{secrets.USERNAME}}/portfolio:${{github.run_number}}
-            docker push ${{secrets.USERNAME}}/portfolio
+            docker login -u ${{secrets.REGISTRY_USERNAME}} -p ${{secrets.REGISTRY_PASS}}
+            docker push ${{secrets.REGISTRY_USERNAME}}/portfolio:${{github.run_number}}
+            docker push ${{secrets.REGISTRY_USERNAME}}/portfolio
