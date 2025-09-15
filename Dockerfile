@@ -6,6 +6,10 @@ COPY . .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN pip install --upgrade pip setuptools wheel
+
+RUN pip install --upgrade Werkzeug==3.0.3
+
 EXPOSE 5001
 
 ENV FLASK_APP=app.py 
