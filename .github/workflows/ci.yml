@@ -28,14 +28,14 @@ jobs:
           docker build -t ${{secrets.ECR_REGISTRY}}/portfolio:${{github.run_number}} .
           docker build -t ${{secrets.ECR_REGISTRY}}/portfolio:latest .
    
-      # --- SIMPLE TRIVY SCAN STARTS HERE ---
+         # --- SIMPLE TRIVY SCAN STARTS HERE ---
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: '${{ secrets.ECR_REGISTRY }}/portfolio:${{ github.run_number }}'
           exit-code: '1' # This will fail the job if any vulnerabilities are found
+          severity: 'CRITICAL,HIGH'
       
-      # --- SIMPLE TRIVY SCAN ENDS HERE ---
 
       - name: Push image 
         run: |
