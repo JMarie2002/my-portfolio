@@ -22,7 +22,7 @@ jobs:
 
       ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}          # e.g. 405894862034.dkr.ecr.us-east-1.amazonaws.com
 
-      ECR_REPOSITORY: portfoilo                          # <-- intentional misspelling
+      ECR_REPOSITORY: portfoilo                          # intentional misspelling
 
       VERSION_TAG: ${{ github.run_number }}
 
@@ -82,7 +82,7 @@ jobs:
 
         with:
 
-          image-ref: '${{ secrets.ECR_REGISTRY }}/portfoilo:${{ github.run_number }}'  # <-- portfoilo
+          image-ref: '${{ secrets.ECR_REGISTRY }}/portfoilo:${{ github.run_number }}'
 
           exit-code: '1'
 
@@ -110,7 +110,7 @@ jobs:
 
       ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
 
-      ECR_REPOSITORY: portfoilo                          # <-- portfoilo
+      ECR_REPOSITORY: portfoilo
 
       VERSION_TAG: ${{ github.run_number }}
 
@@ -119,6 +119,8 @@ jobs:
       - name: SSH to Server and deploy
 
         uses: appleboy/ssh-action@v1
+
+        # pass env vars to the remote host (required when using `set -u`)
 
         envs: AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,VERSION_TAG,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY
 
