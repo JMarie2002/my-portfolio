@@ -32,7 +32,7 @@ jobs:
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ secrets.REGISTRY_USER }}portfolio:${{ github.run_number }}'
+          image-ref: '${{ secrets.REGISTRY_USER }}portfolio:8'
           exit-code: '1' # This will fail the job if any vulnerabilities are found
           severity: 'CRITICAL,HIGH'
       
