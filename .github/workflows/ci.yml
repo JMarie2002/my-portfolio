@@ -82,6 +82,116 @@ jobs:
 
         with:
 
-          image-ref: '${{ secrets.ECR_REGISTRY }}/_
+          image-ref: '${{ secrets.ECR_REGISTRY }}/portfoilo:${{ github.run_number }}'  # <-- portfoilo
+
+          exit-code: '1'
+
+          severity: 'CRITICAL,HIGH'
+ 
+      - name: Push image tags
+
+        run: |
+
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+
+          docker push "$IMAGE:${VERSION_TAG}"
+
+          docker push "$IMAGE:latest"
+ 
+  deploy:
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    env:
+
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+
+      ECR_REPOSITORY: portfoilo                          # <-- portfoilo
+
+      VERSION_TAG: ${{ github.run_number }}
+
+    steps:
+
+      - name: SSH to Server and deploy
+
+        uses: appleboy/ssh-action@v1
+
+        envs: AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,VERSION_TAG,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY
+
+        with:
+
+          host: ${{ secrets.HOST }}
+
+          username: ${{ secrets.USERNAME }}
+
+          key: ${{ secrets.KEY }}
+
+          script: |
+
+            set -euo pipefail
+
+            IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}:${VERSION_TAG}"
+ 
+            # Install AWS CLI if missing
+
+            if ! command -v aws >/dev/null 2>&1; then
+
+              echo "Installing AWS CLI..."
+
+              sudo apt-get update -y
+
+              sudo apt-get install -y unzip curl
+
+              curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+              unzip -q awscliv2.zip
+
+              sudo ./aws/install
+
+              rm -rf aws awscliv2.zip
+
+            fi
+ 
+            # Configure AWS creds (for ECR login) on the remote host
+
+            mkdir -p ~/.aws
+
+            cat > ~/.aws/credentials <<EOF
+
+            [default]
+
+            aws_access_key_id=${AWS_ACCESS_KEY_ID}
+
+            aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}
+
+            EOF
+
+            cat > ~/.aws/config <<EOF
+
+            [default]
+
+            region=${AWS_REGION}
+
+            output=json
+
+            EOF
+ 
+            # Login to ECR and pull
+
+            aws ecr get-login-password --region "${AWS_REGION}" \
+
+              | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+
+            docker pull "${IMAGE}"
+ 
+            # Restart container
+
+            docker rm -f resume || true
+
+            docker run -d --name resume -p 8080:5001 "${IMAGE}"
 
  
