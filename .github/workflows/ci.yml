@@ -1,67 +1,183 @@
 name: CI
-
+ 
 on:
+
   push:
+
     branches: [ "main" ]
+
   pull_request:
+
     branches: [ "main" ]
  
 jobs:
-  
+
   build:
-    runs-on: ubuntu-latest  
-    steps:
-      - uses: actions/checkout@v4
-  
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-  
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-  
-      - name: Build image
-        run: | 
-          docker build -t ${{secrets.REGISTRY_USER}}portfolio:${{github.run_number}} .
-          docker build -t ${{secrets.REGISTRY_USER}}portfolio:latest .
-   
-         # --- SIMPLE TRIVY SCAN STARTS HERE ---
-      - name: Scan with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: '${{ secrets.REGISTRY_USER }}portfolio:${{github.run_number}}'
-          exit-code: '1' # This will fail the job if any vulnerabilities are found
-          severity: 'CRITICAL,HIGH'
-      
 
-      - name: Push image 
-        run: |
-          docker push ${{secrets.ECR_REGISTRY}}portfolio:${{github.run_number}}
-          docker push ${{secrets.ECR_REGISTRY}}portfolio:latest
-
-  deploy:
-    needs: build  
     runs-on: ubuntu-latest
+
+    env:
+
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}          # e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com
+
+      ECR_REPOSITORY: portfolio                           # no leading slash
+
+      VERSION_TAG: ${{ github.run_number }}               # you can change to a release tag if you want
+
     steps:
+
+      - uses: actions/checkout@v4
+ 
       - name: Configure AWS credentials
+
         uses: aws-actions/configure-aws-credentials@v4
+
         with:
+
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
           aws-region: ${{ secrets.AWS_REGION }}
-    
+ 
       - name: Login to Amazon ECR
+
+        id: ecr
+
         uses: aws-actions/amazon-ecr-login@v2
-    
-      - name: SSH to Server
-        uses: appleboy/ssh-action@v1
+ 
+      - name: Build image (multi-tag once)
+
+        run: |
+
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+
+          docker build -t "$IMAGE:${VERSION_TAG}" -t "$IMAGE:latest" .
+ 
+      # --- SIMPLE TRIVY SCAN STARTS HERE ---
+
+      - name: Scan with Trivy
+
+        uses: aquasecurity/trivy-action@master
+
         with:
+
+          image-ref: '${{ secrets.ECR_REGISTRY }}/portfolio:${{ github.run_number }}'
+
+          exit-code: '1'                # fail on HIGH/CRITICAL (as configured below)
+
+          severity: 'CRITICAL,HIGH'
+ 
+      - name: Push image tags
+
+        run: |
+
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+
+          docker push "$IMAGE:${VERSION_TAG}"
+
+          docker push "$IMAGE:latest"
+ 
+  deploy:
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    env:
+
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+
+      ECR_REPOSITORY: portfolio
+
+      VERSION_TAG: ${{ github.run_number }}
+
+    steps:
+
+      - name: SSH to Server and deploy
+
+        uses: appleboy/ssh-action@v1
+
+        with:
+
           host: ${{ secrets.HOST }}
+
           username: ${{ secrets.USERNAME }}
+
           key: ${{ secrets.KEY }}
-          script: | 
+
+          script: |
+
+            set -euo pipefail
+
+            IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}:${VERSION_TAG}"
+
+            LATEST_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+ 
+            # Ensure AWS CLI is present (install if missing)
+
+            if ! command -v aws >/dev/null 2>&1; then
+
+              echo "Installing AWS CLI..."
+
+              sudo apt-get update -y
+
+              sudo apt-get install -y unzip
+
+              curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+              unzip -q awscliv2.zip
+
+              sudo ./aws/install
+
+              rm -rf aws awscliv2.zip
+
+            fi
+ 
+            # Configure AWS credentials on the remote so we can login to ECR
+
+            mkdir -p ~/.aws
+
+            cat > ~/.aws/credentials <<EOF
+
+            [default]
+
+            aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}
+
+            aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+            EOF
+
+            cat > ~/.aws/config <<EOF
+
+            [default]
+
+            region=${AWS_REGION}
+
+            output=json
+
+            EOF
+ 
+            # Login to ECR on the remote host
+
+            aws ecr get-login-password --region "${AWS_REGION}" \
+
+              | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+ 
+            # Pull the freshly pushed image (optional: pull latest too)
+
+            docker pull "${IMAGE}" || (echo "Failed to pull ${IMAGE}" && exit 1)
+ 
+            # Restart container
+
             docker rm -f resume || true
-            docker run -d --name resume -p 8080:5001 ${{secrets.ECR_REGISTRY}}/portfolio:${{github.run_number}}
+
+            # Map whatever ports you actually need; you had 8080:5001
+
+            docker run -d --name resume -p 8080:5001 "${IMAGE}"
+
+ 
