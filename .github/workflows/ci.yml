@@ -25,21 +25,21 @@ jobs:
   
       - name: Build image
         run: | 
-          docker build -t ${{secrets.REGISTRY_USER}}portfolio:8 .
-          docker build -t ${{secrets.REGISTRY_USER}}portfolio:latest .
+          docker build -t ${{secrets.REGISTRY_USER}}/portfolio:${{github.run_number}} .
+          docker build -t ${{secrets.REGISTRY_USER}}/portfolio:latest .
    
          # --- SIMPLE TRIVY SCAN STARTS HERE ---
       - name: Scan with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ secrets.REGISTRY_USER }}portfolio:8'
+          image-ref: '${{ secrets.REGISTRY_USER }}/portfolio:${{github.run_number}}'
           exit-code: '1' # This will fail the job if any vulnerabilities are found
           severity: 'CRITICAL,HIGH'
       
 
       - name: Push image 
         run: |
-          docker push ${{secrets.ECR_REGISTRY}}/portfolio:8
+          docker push ${{secrets.ECR_REGISTRY}}/portfolio:${{github.run_number}}
           docker push ${{secrets.ECR_REGISTRY}}/portfolio:latest
 
   deploy:
