@@ -22,7 +22,7 @@ jobs:
 
       ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}          # e.g. 405894862034.dkr.ecr.us-east-1.amazonaws.com
 
-      ECR_REPOSITORY: portfolio                           # correct repo name (no leading /)
+      ECR_REPOSITORY: portfoilo                          # <-- using the typo spelling
 
       VERSION_TAG: ${{ github.run_number }}
 
@@ -52,25 +52,19 @@ jobs:
 
         run: |
 
-          set -e
+          set -euo pipefail
 
-          if ! aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --region "$AWS_REGION" >/dev/null 2>&1; then
+          if aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --region "$AWS_REGION" >/dev/null 2>&1; then
 
-            echo "ECR repo $ECR_REPOSITORY not found. Creating…"
-
-            aws ecr create-repository \
-
-              --repository-name "$ECR_REPOSITORY" \
-
-              --image-scanning-configuration scanOnPush=true \
-
-              --region "$AWS_REGION" >/dev/null
-
-            echo "Created $ECR_REPOSITORY"
+            echo "ECR repo $ECR_REPOSITORY already exists."
 
           else
 
-            echo "ECR repo $ECR_REPOSITORY already exists."
+            echo "ECR repo $ECR_REPOSITORY not found. Creating…"
+
+            aws ecr create-repository --repository-name "$ECR_REPOSITORY" --image-scanning-configuration scanOnPush=true --region "$AWS_REGION" >/dev/null
+
+            echo "Created $ECR_REPOSITORY"
 
           fi
  
@@ -82,17 +76,15 @@ jobs:
 
           docker build -t "$IMAGE:${VERSION_TAG}" -t "$IMAGE:latest" .
  
-      # --- SIMPLE TRIVY SCAN ---
-
       - name: Scan with Trivy
 
         uses: aquasecurity/trivy-action@master
 
         with:
 
-          image-ref: '${{ secrets.ECR_REGISTRY }}/portfolio:${{ github.run_number }}'
+          image-ref: '${{ secrets.ECR_REGISTRY }}/portfoilo:${{ github.run_number }}'
 
-          exit-code: '1'                 # fail job on HIGH/CRITICAL
+          exit-code: '1'
 
           severity: 'CRITICAL,HIGH'
  
@@ -118,7 +110,7 @@ jobs:
 
       ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
 
-      ECR_REPOSITORY: portfolio
+      ECR_REPOSITORY: portfoilo
 
       VERSION_TAG: ${{ github.run_number }}
 
@@ -199,7 +191,5 @@ jobs:
             docker rm -f resume || true
 
             docker run -d --name resume -p 8080:5001 "${IMAGE}"
-
- 
 
  
