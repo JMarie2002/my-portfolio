@@ -120,10 +120,6 @@ jobs:
 
         uses: appleboy/ssh-action@v1
 
-        # pass env vars to the remote host (required when using `set -u`)
-
-        envs: AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,VERSION_TAG,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY
-
         with:
 
           host: ${{ secrets.HOST }}
@@ -131,6 +127,10 @@ jobs:
           username: ${{ secrets.USERNAME }}
 
           key: ${{ secrets.KEY }}
+
+          # pass env vars into the remote shell
+
+          envs: AWS_REGION,ECR_REGISTRY,ECR_REPOSITORY,VERSION_TAG,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY
 
           script: |
 
