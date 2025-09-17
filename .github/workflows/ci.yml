@@ -20,11 +20,11 @@ jobs:
 
       AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}          # e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}          # e.g. 405894862034.dkr.ecr.us-east-1.amazonaws.com
 
-      ECR_REPOSITORY: portfolio                           # no leading slash
+      ECR_REPOSITORY: portfolio                           # correct repo name (no leading /)
 
-      VERSION_TAG: ${{ github.run_number }}               # you can change to a release tag if you want
+      VERSION_TAG: ${{ github.run_number }}
 
     steps:
 
@@ -48,6 +48,32 @@ jobs:
 
         uses: aws-actions/amazon-ecr-login@v2
  
+      - name: Ensure ECR repository exists
+
+        run: |
+
+          set -e
+
+          if ! aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --region "$AWS_REGION" >/dev/null 2>&1; then
+
+            echo "ECR repo $ECR_REPOSITORY not found. Creating…"
+
+            aws ecr create-repository \
+
+              --repository-name "$ECR_REPOSITORY" \
+
+              --image-scanning-configuration scanOnPush=true \
+
+              --region "$AWS_REGION" >/dev/null
+
+            echo "Created $ECR_REPOSITORY"
+
+          else
+
+            echo "ECR repo $ECR_REPOSITORY already exists."
+
+          fi
+ 
       - name: Build image (multi-tag once)
 
         run: |
@@ -56,7 +82,7 @@ jobs:
 
           docker build -t "$IMAGE:${VERSION_TAG}" -t "$IMAGE:latest" .
  
-      # --- SIMPLE TRIVY SCAN STARTS HERE ---
+      # --- SIMPLE TRIVY SCAN ---
 
       - name: Scan with Trivy
 
@@ -66,7 +92,7 @@ jobs:
 
           image-ref: '${{ secrets.ECR_REGISTRY }}/portfolio:${{ github.run_number }}'
 
-          exit-code: '1'                # fail on HIGH/CRITICAL (as configured below)
+          exit-code: '1'                 # fail job on HIGH/CRITICAL
 
           severity: 'CRITICAL,HIGH'
  
@@ -115,10 +141,8 @@ jobs:
             set -euo pipefail
 
             IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}:${VERSION_TAG}"
-
-            LATEST_IMAGE="${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
  
-            # Ensure AWS CLI is present (install if missing)
+            # Install AWS CLI if missing
 
             if ! command -v aws >/dev/null 2>&1; then
 
@@ -126,7 +150,7 @@ jobs:
 
               sudo apt-get update -y
 
-              sudo apt-get install -y unzip
+              sudo apt-get install -y unzip curl
 
               curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 
@@ -138,11 +162,11 @@ jobs:
 
             fi
  
-            # Configure AWS credentials on the remote so we can login to ECR
+            # Configure AWS creds (for ECR login) on the remote host
 
             mkdir -p ~/.aws
 
-            cat > ~/.aws/credentials <<EOF
+            cat > ~/.aws/credentials <<'EOF'
 
             [default]
 
@@ -152,32 +176,30 @@ jobs:
 
             EOF
 
-            cat > ~/.aws/config <<EOF
+            cat > ~/.aws/config <<'EOF'
 
             [default]
 
-            region=${AWS_REGION}
+            region=${{ secrets.AWS_REGION }}
 
             output=json
 
             EOF
  
-            # Login to ECR on the remote host
+            # Login to ECR and pull
 
             aws ecr get-login-password --region "${AWS_REGION}" \
 
               | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
- 
-            # Pull the freshly pushed image (optional: pull latest too)
 
-            docker pull "${IMAGE}" || (echo "Failed to pull ${IMAGE}" && exit 1)
+            docker pull "${IMAGE}"
  
             # Restart container
 
             docker rm -f resume || true
 
-            # Map whatever ports you actually need; you had 8080:5001
-
             docker run -d --name resume -p 8080:5001 "${IMAGE}"
+
+ 
 
  
