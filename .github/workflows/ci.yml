@@ -25,7 +25,7 @@ jobs:
   
       - name: Build image
         run: | 
-          docker build -t ${{secrets.REGISTRY_USER}}portfolio:${{github.run_number}} .
+          docker build -t ${{secrets.REGISTRY_USER}}portfolio:8 .
           docker build -t ${{secrets.REGISTRY_USER}}portfolio:latest .
    
          # --- SIMPLE TRIVY SCAN STARTS HERE ---
@@ -39,7 +39,7 @@ jobs:
 
       - name: Push image 
         run: |
-          docker push ${{secrets.ECR_REGISTRY}}/portfolio:${{github.run_number}}
+          docker push ${{secrets.ECR_REGISTRY}}/portfolio:8
           docker push ${{secrets.ECR_REGISTRY}}/portfolio:latest
 
   deploy:
