@@ -7,27 +7,37 @@ on:
 env:
   AWS_REGION: us-east-1                 
   ECR_REPOSITORY: utc-app               
-  ECS_CLUSTER: utc-cluster              
-  ECS_SERVICE: utc-service              
+  ECS_CLUSTER: utc-cluster
+  ECS_SERVICE: utc-service
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # -------------------------
+      # CHECKOUT CODE
+      # -------------------------
       - uses: actions/checkout@v4
 
+      # -------------------------
+      # PYTHON SETUP
+      # -------------------------
       - uses: actions/setup-python@v4
         with:
           python-version: 3.11
 
+      # -------------------------
+      # INSTALL DEPENDENCIES + TESTS
+      # -------------------------
       - name: Install dependencies & run tests
         run: |
           pip install -r requirements.txt
+          pip install pytest         # <-- FIX ADDED HERE
           pytest
 
       # -------------------------
-      # AWS AUTH
+      # AWS LOGIN
       # -------------------------
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -47,16 +57,16 @@ jobs:
           IMAGE_TAG=${GITHUB_SHA}
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ECR_URI="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY"
-          
-          echo "ECR URI: $ECR_URI"
 
-          # YOUR ORIGINAL BUILD COMMAND
+          echo "Using ECR URI: $ECR_URI"
+
+          # Your original docker build command
           docker build -t JMarie2002/portcicd .
 
-          # Tag the local image for ECR
+          # Tag your locally built image for ECR
           docker tag JMarie2002/portcicd:latest $ECR_URI:$IMAGE_TAG
 
-          # Push to ECR
+          # Push image to ECR
           docker push $ECR_URI:$IMAGE_TAG
 
           echo "IMAGE_URI=$ECR_URI:$IMAGE_TAG" >> $GITHUB_ENV
@@ -70,4 +80,3 @@ jobs:
             --cluster $ECS_CLUSTER \
             --service $ECS_SERVICE \
             --force-new-deployment
-
