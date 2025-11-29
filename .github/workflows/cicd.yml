@@ -8,7 +8,7 @@ env:
   AWS_REGION: us-east-1                 
   ECR_REPOSITORY: utc-app               
   ECS_CLUSTER: utc-cluster
-  ECS_SERVICE: utc-service
+  ECS_SERVICE: utc-service-service-7
 
 jobs:
   deploy:
