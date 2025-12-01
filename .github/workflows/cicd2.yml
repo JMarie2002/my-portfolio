@@ -91,3 +91,4 @@ jobs:
             --registry-password ${{ secrets.ACR_PASSWORD }} \
             --ports 80 \
             --restart-policy Always
+            --os-type Linux
