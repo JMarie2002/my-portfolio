@@ -1,13 +1,13 @@
-name: UTC App CI/CD to ACI
+name: UTC App CI/CD to Azure Container Instance
 
 on:
   push:
     branches: [ "main" ]
 
 env:
-  ACR_NAME: utcapp          # Your existing ACR name
-  IMAGE_NAME: portcicd      # Docker repository name
-  ACI_NAME: utcapp-container
+  ACR_NAME: utc-project           # Your ACR name
+  IMAGE_NAME: portcicd            # Repository name in ACR
+  ACI_NAME: utcapp-container      # Name for your Azure Container Instance
 
 jobs:
   deploy:
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # -------------------------
-      # PYTHON + TESTS
+      # PYTHON SETUP + TESTS
       # -------------------------
       - uses: actions/setup-python@v4
         with:
@@ -67,22 +67,26 @@ jobs:
           echo "IMAGE_URI=$ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG" >> $GITHUB_ENV
 
       # -------------------------
+      # ENSURE RESOURCE GROUP EXISTS
+      # -------------------------
+      - name: Ensure resource group exists
+        run: |
+          az group create --name ${{ secrets.ACI_RESOURCE_GROUP }} --location eastus
+
+      # -------------------------
       # DEPLOY TO AZURE CONTAINER INSTANCE
       # -------------------------
       - name: Deploy to Azure Container Instance
         run: |
-          # Delete container if it already exists
-          az container delete \
-            --name $ACI_NAME \
-            --resource-group ${{ secrets.ACI_RESOURCE_GROUP }} \
-            --yes || true
+          # Delete existing container if it exists
+          az container delete --name $ACI_NAME --resource-group ${{ secrets.ACI_RESOURCE_GROUP }} --yes || true
 
-          # Create new container with latest image
+          # Create container with latest image
           az container create \
             --resource-group ${{ secrets.ACI_RESOURCE_GROUP }} \
             --name $ACI_NAME \
             --image ${{ env.IMAGE_URI }} \
-            --registry-login-server $ACR_NAME.azurecr.io \
+            --registry-login-server "$ACR_NAME.azurecr.io" \
             --registry-username ${{ secrets.ACR_USERNAME }} \
             --registry-password ${{ secrets.ACR_PASSWORD }} \
             --ports 80 \
