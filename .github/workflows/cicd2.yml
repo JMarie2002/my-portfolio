@@ -5,9 +5,9 @@ on:
     branches: [ "main" ]
 
 env:
-  ACR_NAME: utc-project           # Your ACR name
-  IMAGE_NAME: portcicd            # Repository name in ACR
-  ACI_NAME: utcapp-container      # Name for your Azure Container Instance
+  ACR_NAME: utcapp           # Your ACR name (must be lowercase, no hyphens)
+  IMAGE_NAME: portcicd        # Repository name in ACR
+  ACI_NAME: utcapp-container  # Name for your Azure Container Instance
 
 jobs:
   deploy:
